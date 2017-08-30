@@ -23,6 +23,8 @@ public class BridgeUtil {
 	public final static String JAVASCRIPT_STR = "javascript:";
 	
 	public static String parseFunctionName(String jsUrl){
+		// 如 "javascript:WebViewJavascriptBridge._fetchQueue();"
+		// -- "_fetchQueue();" -- "_fetchQueue"
 		return jsUrl.replace("javascript:WebViewJavascriptBridge.", "").replaceAll("\\(.*\\);", "");
 	}
 	
@@ -82,6 +84,11 @@ public class BridgeUtil {
             StringBuilder sb = new StringBuilder();
             do {
                 line = bufferedReader.readLine();
+				// \s 匹配任何空白字符，包括空格、制表符、换页符等等
+				// . 匹配除换行符 \n 之外的任何单字符。要匹配 . ，请使用 \.
+				// '*'，'+'和'?'这三个符号，表示一个或一序列字符重复出现的次数。它们分别表示“没有或
+				//      更多”，“一次或更多”还有“没有或一次”
+				// 因此如下表示的应该是过滤掉注释行
                 if (line != null && !line.matches("^\\s*\\/\\/.*")) {
                     sb.append(line);
                 }

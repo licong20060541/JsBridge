@@ -2,17 +2,13 @@ package com.github.lzyzsd.jsbridge;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -100,6 +96,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 		doSend(null, data, responseCallback);
 	}
 
+    // 52
 	private void doSend(String handlerName, String data, CallBackFunction responseCallback) {
 		Message m = new Message();
 		if (!TextUtils.isEmpty(data)) {
@@ -116,11 +113,12 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 		queueMessage(m);
 	}
 
+    // 53
 	private void queueMessage(Message m) {
 		if (startupMessage != null) {
 			startupMessage.add(m);
 		} else {
-			dispatchMessage(m);
+			dispatchMessage(m); // 23
 		}
 	}
 
@@ -129,6 +127,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
         //escape special characters for json string
         messageJson = messageJson.replaceAll("(\\\\)([^utrn])", "\\\\\\\\$1$2");
         messageJson = messageJson.replaceAll("(?<=[^\\\\])(\")", "\\\\\"");
+        // 23 54 调用js方法 _handleMessageFromNative()
         String javascriptCommand = String.format(BridgeUtil.JS_HANDLE_MESSAGE_FROM_JAVA, messageJson);
         if (Thread.currentThread() == Looper.getMainLooper().getThread()) {
             this.loadUrl(javascriptCommand);
@@ -137,6 +136,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 
 	void flushMessageQueue() {
 		if (Thread.currentThread() == Looper.getMainLooper().getThread()) {
+            // 此处的new CallBackFunction()负责分发消息给对应的handler处理，然后有必要时将结果发给js层！！！
 			loadUrl(BridgeUtil.JS_FETCH_QUEUE_FROM_JAVA, new CallBackFunction() {
 
 				@Override
@@ -153,29 +153,29 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 						return;
 					}
 					for (int i = 0; i < list.size(); i++) {
-						Message m = list.get(i);
+						Message m = list.get(i); // 依次处理Message
 						String responseId = m.getResponseId();
 						// 是否是response
-						if (!TextUtils.isEmpty(responseId)) {
+						if (!TextUtils.isEmpty(responseId)) { // 60. java 请求js处理，结果返回这里
 							CallBackFunction function = responseCallbacks.get(responseId);
 							String responseData = m.getResponseData();
 							function.onCallBack(responseData);
 							responseCallbacks.remove(responseId);
 						} else {
 							CallBackFunction responseFunction = null;
-							// if had callbackId
+							// 17. if had callbackId, 由js调用时设置， 没有callback则不设置
 							final String callbackId = m.getCallbackId();
-							if (!TextUtils.isEmpty(callbackId)) {
-								responseFunction = new CallBackFunction() {
+							if (!TextUtils.isEmpty(callbackId)) { // 18. 有callback，处理结束后需要传递给js
+								responseFunction = new CallBackFunction() { // 21 发送结果数据给js，第二条主线
 									@Override
 									public void onCallBack(String data) {
 										Message responseMsg = new Message();
 										responseMsg.setResponseId(callbackId);
 										responseMsg.setResponseData(data);
-										queueMessage(responseMsg);
+										queueMessage(responseMsg); // 22 调用queueMessage实现，此时利用的是responseId了, 其值就是请求数据时的callbackId
 									}
 								};
-							} else {
+							} else { // 19. 没有callback时处理完后就结束了
 								responseFunction = new CallBackFunction() {
 									@Override
 									public void onCallBack(String data) {
@@ -189,7 +189,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 							} else {
 								handler = defaultHandler;
 							}
-							if (handler != null){
+							if (handler != null){ // 20. 交给注册的handler处理，处理完后由responseFunction处理结果数据
 								handler.handler(m.getData(), responseFunction);
 							}
 						}
@@ -201,6 +201,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 
 	public void loadUrl(String jsUrl, CallBackFunction returnCallback) {
 		this.loadUrl(jsUrl);
+        // 可以保证下次能取到吗？可以因为shouldOverrideUrlLoading会在put()之后调用
 		responseCallbacks.put(BridgeUtil.parseFunctionName(jsUrl), returnCallback);
 	}
 
@@ -217,6 +218,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 	}
 
 	/**
+     * 51
 	 * call javascript registered handler
 	 *
      * @param handlerName
